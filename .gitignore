@@ -1,0 +1,18 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Google / clasp authentication
+.clasprc.json
+
+# Node.js
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

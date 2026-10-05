@@ -72,15 +72,27 @@ function reprocessSelectedReservation() {
     return;
   }
 
-  processReservationRow(sheet, row);
+  var processed = processReservationRow(sheet, row);
+  if (!processed) {
+    ui.alert(row + '行目はすでに処理が完了しています（予約完了メール送信済み）。カレンダー登録・メール送信は行いませんでした。');
+    return;
+  }
   ui.alert(row + '行目の再実行が完了しました。処理結果はG〜J列をご確認ください。');
 }
 
 /**
  * 予約1件分の自動処理（フォーム送信時・手動再実行時で共通利用）。
+ *
+ * I列（メール送信日時）が記録済みの行は正常完了済みとみなし、何もせずに false を返す。
+ * I列はメール送信に成功したときだけ記録されるため、エラーで終わった行
+ * （I列が空）は再実行で処理を続けられる。それ以外は処理を行い true を返す。
  */
 function processReservationRow(sheet, row) {
   var values = sheet.getRange(row, 1, 1, TOTAL_COLUMNS).getValues()[0];
+  if (isCompletedRow(values)) {
+    return false;
+  }
+
   var name = values[COLUMNS.NAME - 1];
   var email = values[COLUMNS.EMAIL - 1];
   var dateValue = values[COLUMNS.RESERVATION_DATE - 1];
@@ -90,7 +102,7 @@ function processReservationRow(sheet, row) {
 
   if (!name || !email || !dateValue || !timeValue || !consultation) {
     recordError(sheet, row, '入力値が不足しています（お名前・メールアドレス・予約日・予約時間・相談内容のいずれかが空です）');
-    return;
+    return true;
   }
 
   var startDateTime;
@@ -98,7 +110,7 @@ function processReservationRow(sheet, row) {
     startDateTime = buildReservationDateTime(dateValue, timeValue);
   } catch (err) {
     recordError(sheet, row, '予約日時の解析に失敗しました: ' + err.message);
-    return;
+    return true;
   }
   var endDateTime = new Date(startDateTime.getTime() + RESERVATION_DURATION_MINUTES * 60 * 1000);
 
@@ -108,7 +120,7 @@ function processReservationRow(sheet, row) {
     // 新規作成時のみ過去日時判定を行う（既にCalendar登録済みの再実行は対象外）
     if (startDateTime.getTime() <= new Date().getTime()) {
       recordError(sheet, row, '予約日時が過去のため、Calendar登録・メール送信を行いません');
-      return;
+      return true;
     }
 
     setStatus(sheet, row, STATUS.PROCESSING);
@@ -117,7 +129,7 @@ function processReservationRow(sheet, row) {
       eventId = createCalendarEvent(name, email, consultation, startDateTime, endDateTime);
     } catch (err) {
       recordError(sheet, row, 'Calendar登録に失敗しました: ' + err.message);
-      return;
+      return true;
     }
     // メール送信より先にイベントIDを保存する
     sheet.getRange(row, COLUMNS.EVENT_ID).setValue(eventId);
@@ -131,12 +143,23 @@ function processReservationRow(sheet, row) {
     sheet.getRange(row, COLUMNS.STATUS).setValue(STATUS.CALENDAR_ONLY);
     sheet.getRange(row, COLUMNS.MAIL_SENT_AT).setValue('');
     sheet.getRange(row, COLUMNS.ERROR).setValue('メール送信に失敗しました: ' + err.message);
-    return;
+    return true;
   }
 
   sheet.getRange(row, COLUMNS.STATUS).setValue(STATUS.COMPLETED);
   sheet.getRange(row, COLUMNS.MAIL_SENT_AT).setValue(new Date());
   sheet.getRange(row, COLUMNS.ERROR).setValue('');
+  return true;
+}
+
+/**
+ * 予約行が正常完了済みかどうかを判定する。
+ * I列（メール送信日時）はメール送信に成功したときだけ記録され、
+ * メール送信に失敗したときは空欄に戻されるため、この列を完了の判定に使う。
+ */
+function isCompletedRow(values) {
+  var mailSentAt = values[COLUMNS.MAIL_SENT_AT - 1];
+  return mailSentAt !== '' && mailSentAt !== null && mailSentAt !== undefined;
 }
 
 /**

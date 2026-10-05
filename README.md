@@ -2,7 +2,7 @@
 
 Googleフォームの予約回答をもとに、カレンダーへの予定登録・予約完了メール送信・処理結果の記録を自動化します。
 
-[作品一覧](https://github.com/moedaichi0629-ai/landing-page) · [ポートフォリオ](https://moedaichi0629-ai.github.io/landing-page/)
+[作品一覧](https://github.com/moedaichi0629-ai/landing-page) · [ポートフォリオ](https://moedaichi0629-ai.github.io/)
 
 ## 解決する課題
 
